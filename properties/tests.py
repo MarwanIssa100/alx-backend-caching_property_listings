@@ -5,6 +5,7 @@ from .models import Property
 from .utils import get_all_properties
 from decimal import Decimal
 import json
+from unittest.mock import patch
 
 # Create your tests here.
 
@@ -125,3 +126,79 @@ class GetAllPropertiesTest(TestCase):
         cached_properties = cache.get('all_properties')
         self.assertIsNotNone(cached_properties)
         self.assertEqual(cached_properties.count(), 0)
+
+
+class PropertySignalsTest(TestCase):
+    def setUp(self):
+        # Clear cache before each test
+        cache.clear()
+
+    def test_post_save_signal_clears_cache_on_create(self):
+        """Test that post_save signal clears cache when property is created"""
+        # Populate cache first
+        properties = get_all_properties()
+        self.assertIsNotNone(cache.get('all_properties'))
+        
+        # Create a new property (this should trigger the signal)
+        with patch('builtins.print') as mock_print:
+            property = Property.objects.create(
+                title='New Property',
+                description='New Description',
+                price=Decimal('500000.00'),
+                location='New Location'
+            )
+        
+        # Cache should be cleared
+        self.assertIsNone(cache.get('all_properties'))
+        
+        # Check that print statement was called
+        mock_print.assert_called_with("Cache cleared: Property 'New Property' was created")
+
+    def test_post_save_signal_clears_cache_on_update(self):
+        """Test that post_save signal clears cache when property is updated"""
+        # Create a property first
+        property = Property.objects.create(
+            title='Test Property',
+            description='Test Description',
+            price=Decimal('300000.00'),
+            location='Test Location'
+        )
+        
+        # Populate cache
+        properties = get_all_properties()
+        self.assertIsNotNone(cache.get('all_properties'))
+        
+        # Update the property (this should trigger the signal)
+        with patch('builtins.print') as mock_print:
+            property.title = 'Updated Property'
+            property.save()
+        
+        # Cache should be cleared
+        self.assertIsNone(cache.get('all_properties'))
+        
+        # Check that print statement was called
+        mock_print.assert_called_with("Cache cleared: Property 'Updated Property' was updated")
+
+    def test_post_delete_signal_clears_cache(self):
+        """Test that post_delete signal clears cache when property is deleted"""
+        # Create a property first
+        property = Property.objects.create(
+            title='Test Property',
+            description='Test Description',
+            price=Decimal('300000.00'),
+            location='Test Location'
+        )
+        
+        # Populate cache
+        properties = get_all_properties()
+        self.assertIsNotNone(cache.get('all_properties'))
+        
+        # Delete the property (this should trigger the signal)
+        with patch('builtins.print') as mock_print:
+            property.delete()
+        
+        # Cache should be cleared
+        self.assertIsNone(cache.get('all_properties'))
+        
+        # Check that print statement was called
+        mock_print.assert_called_with("Cache cleared: Property 'Test Property' was deleted")

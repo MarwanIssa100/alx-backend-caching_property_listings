@@ -95,6 +95,12 @@ The property list endpoint uses a two-layer caching strategy:
 - **After 15 min, within 1 hour**: Data fetched from data cache, view response cached
 - **After 1 hour**: Fresh data fetched from database
 
+### Automatic Cache Invalidation:
+The cache is automatically cleared when properties are modified:
+- **Property Created**: Cache cleared via `post_save` signal
+- **Property Updated**: Cache cleared via `post_save` signal  
+- **Property Deleted**: Cache cleared via `post_delete` signal
+
 ## Testing
 
 Run the test suite:
@@ -121,6 +127,26 @@ Access the Django admin at `/admin/` to:
 - Edit existing properties
 - Delete properties
 - View all properties in a table format
+
+## Signals and Cache Management
+
+### Automatic Cache Invalidation
+
+The application uses Django signals to automatically clear the property cache when data changes:
+
+- **`post_save` signal**: Clears cache when properties are created or updated
+- **`post_delete` signal**: Clears cache when properties are deleted
+- **Location**: `properties/signals.py`
+
+This ensures that the cache always contains fresh data after any property modifications.
+
+### App Configuration
+
+The signals are automatically loaded when the app starts:
+
+- **`properties/apps.py`**: Overrides `ready()` method to import signals
+- **`properties/__init__.py`**: Sets default app configuration
+- **Automatic Loading**: Signals are registered when Django starts
 
 ## Utility Functions
 
