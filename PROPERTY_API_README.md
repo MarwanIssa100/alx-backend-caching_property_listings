@@ -52,21 +52,48 @@ python manage.py migrate
 python manage.py populate_properties
 ```
 
-### 4. Run the Development Server
+### 4. Cache Management (Optional)
+```bash
+# Clear property cache only
+python manage.py clear_property_cache
+
+# Clear all cache
+python manage.py clear_property_cache --all
+```
+
+### 5. Run the Development Server
 ```bash
 python manage.py runserver
 ```
 
-### 5. Access the API
+### 6. Access the API
 - **Property Listings**: http://localhost:8000/properties/
 - **Admin Interface**: http://localhost:8000/admin/
 
 ## Caching
 
-The property list endpoint uses Redis caching with a 15-minute duration. This means:
-- First request: Data is fetched from the database
-- Subsequent requests (within 15 minutes): Data is served from Redis cache
-- After 15 minutes: Cache expires and fresh data is fetched
+The property list endpoint uses a two-layer caching strategy:
+
+### 1. View-Level Caching (`@cache_page`)
+- **Duration**: 15 minutes (900 seconds)
+- **Scope**: Entire HTTP response
+- **Key**: Based on URL and request parameters
+
+### 2. Data-Level Caching (`get_all_properties()`)
+- **Duration**: 1 hour (3600 seconds)
+- **Scope**: Database queryset
+- **Key**: `'all_properties'`
+- **Strategy**: 
+  - Check Redis for `'all_properties'` key
+  - If not found, fetch `Property.objects.all()`
+  - Store in Redis for 1 hour
+  - Return the queryset
+
+### Cache Behavior:
+- **First request**: Data fetched from database, cached at both levels
+- **Subsequent requests (within 15 min)**: Served from view cache
+- **After 15 min, within 1 hour**: Data fetched from data cache, view response cached
+- **After 1 hour**: Fresh data fetched from database
 
 ## Testing
 
@@ -94,6 +121,25 @@ Access the Django admin at `/admin/` to:
 - Edit existing properties
 - Delete properties
 - View all properties in a table format
+
+## Utility Functions
+
+### `get_all_properties()`
+
+Located in `properties/utils.py`, this function provides intelligent caching for property data:
+
+```python
+from properties.utils import get_all_properties
+
+# Get all properties (cached for 1 hour)
+properties = get_all_properties()
+```
+
+**Features:**
+- Checks Redis cache first using key `'all_properties'`
+- Falls back to database query if cache miss
+- Automatically caches results for 1 hour (3600 seconds)
+- Returns Django QuerySet for further filtering/operations
 
 ## Model Structure
 
