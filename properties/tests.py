@@ -2,10 +2,10 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.core.cache import cache
 from .models import Property
-from .utils import get_all_properties
+from .utils import get_all_properties, get_redis_cache_metrics
 from decimal import Decimal
 import json
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 # Create your tests here.
 
@@ -202,3 +202,93 @@ class PropertySignalsTest(TestCase):
         
         # Check that print statement was called
         mock_print.assert_called_with("Cache cleared: Property 'Test Property' was deleted")
+
+
+class RedisCacheMetricsTest(TestCase):
+    def setUp(self):
+        # Clear cache before each test
+        cache.clear()
+
+    @patch('properties.utils.get_redis_connection')
+    def test_get_redis_cache_metrics_success(self, mock_get_redis_connection):
+        """Test successful retrieval of Redis cache metrics"""
+        # Mock Redis connection and info response
+        mock_redis_conn = MagicMock()
+        mock_redis_conn.info.return_value = {
+            'keyspace_hits': 1000,
+            'keyspace_misses': 200,
+            'other_stats': 'ignored'
+        }
+        mock_get_redis_connection.return_value = mock_redis_conn
+        
+        # Get metrics
+        metrics = get_redis_cache_metrics()
+        
+        # Verify metrics
+        self.assertEqual(metrics['keyspace_hits'], 1000)
+        self.assertEqual(metrics['keyspace_misses'], 200)
+        self.assertEqual(metrics['total_requests'], 1200)
+        self.assertEqual(metrics['hit_ratio'], 0.8333)  # 1000 / 1200
+        self.assertIsNone(metrics['error'])
+        
+        # Verify Redis connection was called
+        mock_get_redis_connection.assert_called_once_with("default")
+        mock_redis_conn.info.assert_called_once()
+
+    @patch('properties.utils.get_redis_connection')
+    def test_get_redis_cache_metrics_zero_requests(self, mock_get_redis_connection):
+        """Test metrics calculation when there are no requests"""
+        # Mock Redis connection with zero requests
+        mock_redis_conn = MagicMock()
+        mock_redis_conn.info.return_value = {
+            'keyspace_hits': 0,
+            'keyspace_misses': 0
+        }
+        mock_get_redis_connection.return_value = mock_redis_conn
+        
+        # Get metrics
+        metrics = get_redis_cache_metrics()
+        
+        # Verify metrics
+        self.assertEqual(metrics['keyspace_hits'], 0)
+        self.assertEqual(metrics['keyspace_misses'], 0)
+        self.assertEqual(metrics['total_requests'], 0)
+        self.assertEqual(metrics['hit_ratio'], 0.0)
+        self.assertIsNone(metrics['error'])
+
+    @patch('properties.utils.get_redis_connection')
+    def test_get_redis_cache_metrics_connection_error(self, mock_get_redis_connection):
+        """Test metrics retrieval when Redis connection fails"""
+        # Mock Redis connection to raise an exception
+        mock_get_redis_connection.side_effect = Exception("Connection failed")
+        
+        # Get metrics
+        metrics = get_redis_cache_metrics()
+        
+        # Verify error metrics
+        self.assertEqual(metrics['keyspace_hits'], 0)
+        self.assertEqual(metrics['keyspace_misses'], 0)
+        self.assertEqual(metrics['total_requests'], 0)
+        self.assertEqual(metrics['hit_ratio'], 0.0)
+        self.assertIsNotNone(metrics['error'])
+        self.assertIn("Connection failed", metrics['error'])
+
+    @patch('properties.utils.get_redis_connection')
+    def test_get_redis_cache_metrics_missing_keys(self, mock_get_redis_connection):
+        """Test metrics calculation when keyspace stats are missing"""
+        # Mock Redis connection with missing keyspace stats
+        mock_redis_conn = MagicMock()
+        mock_redis_conn.info.return_value = {
+            'other_stats': 'some_value'
+        }
+        mock_get_redis_connection.return_value = mock_redis_conn
+        
+        # Get metrics
+        metrics = get_redis_cache_metrics()
+        
+        # Verify metrics default to 0
+        self.assertEqual(metrics['keyspace_hits'], 0)
+        self.assertEqual(metrics['keyspace_misses'], 0)
+        self.assertEqual(metrics['total_requests'], 0)
+        self.assertEqual(metrics['hit_ratio'], 0.0)
+        self.assertIsNone(metrics['error'])

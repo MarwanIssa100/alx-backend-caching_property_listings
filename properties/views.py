@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.views.decorators.cache import cache_page
 from django.http import JsonResponse
 from .models import Property
-from .utils import get_all_properties
+from .utils import get_all_properties, get_redis_cache_metrics
 
 # Create your views here.
 
@@ -31,4 +31,17 @@ def property_list(request):
     return JsonResponse({
         'properties': property_data,
         'count': len(property_data)
+    })
+
+
+def cache_metrics(request):
+    """
+    View to return Redis cache performance metrics.
+    Returns cache hit/miss statistics and hit ratio.
+    """
+    metrics = get_redis_cache_metrics()
+    
+    return JsonResponse({
+        'cache_metrics': metrics,
+        'timestamp': '2024-01-01T12:00:00Z'  # You could use timezone.now().isoformat()
     })

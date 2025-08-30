@@ -35,6 +35,31 @@ Returns all properties in the database.
 
 **Cache Duration:** 15 minutes (900 seconds)
 
+### GET /properties/metrics/
+
+Returns Redis cache performance metrics.
+
+**Response Format:**
+```json
+{
+    "cache_metrics": {
+        "keyspace_hits": 1000,
+        "keyspace_misses": 200,
+        "hit_ratio": 0.8333,
+        "total_requests": 1200,
+        "error": null
+    },
+    "timestamp": "2024-01-01T12:00:00Z"
+}
+```
+
+**Metrics Explained:**
+- `keyspace_hits`: Number of successful cache retrievals
+- `keyspace_misses`: Number of failed cache retrievals
+- `hit_ratio`: Cache effectiveness (hits / total requests)
+- `total_requests`: Total cache operations
+- `error`: Error message if Redis connection fails
+
 ## Setup and Usage
 
 ### 1. Install Dependencies
@@ -59,6 +84,15 @@ python manage.py clear_property_cache
 
 # Clear all cache
 python manage.py clear_property_cache --all
+
+# Get cache metrics
+python manage.py get_cache_metrics
+
+# Get cache metrics in JSON format
+python manage.py get_cache_metrics --json
+
+# Get detailed cache metrics
+python manage.py get_cache_metrics --verbose
 ```
 
 ### 5. Run the Development Server
@@ -68,6 +102,7 @@ python manage.py runserver
 
 ### 6. Access the API
 - **Property Listings**: http://localhost:8000/properties/
+- **Cache Metrics**: http://localhost:8000/properties/metrics/
 - **Admin Interface**: http://localhost:8000/admin/
 
 ## Caching
@@ -166,6 +201,25 @@ properties = get_all_properties()
 - Falls back to database query if cache miss
 - Automatically caches results for 1 hour (3600 seconds)
 - Returns Django QuerySet for further filtering/operations
+
+### `get_redis_cache_metrics()`
+
+Located in `properties/utils.py`, this function provides Redis cache performance monitoring:
+
+```python
+from properties.utils import get_redis_cache_metrics
+
+# Get cache performance metrics
+metrics = get_redis_cache_metrics()
+```
+
+**Features:**
+- Connects to Redis via `django_redis`
+- Retrieves `keyspace_hits` and `keyspace_misses` from Redis INFO
+- Calculates hit ratio (hits / (hits + misses))
+- Logs metrics for monitoring
+- Returns comprehensive metrics dictionary
+- Handles connection errors gracefully
 
 ## Model Structure
 
